@@ -1,18 +1,32 @@
 define(['exports', 'module',
         './lib/request',
-        './lib/redirect'],
-function(exports, module, Request, redirect) {
+        './lib/redirect',
+        'events',
+        'class'],
+function(exports, module, Request, redirect, Emitter, clazz) {
   
   function Admission() {
+    Emitter.call(this);
     this._providers = {};
     this._redirect = redirect.href().bind(this);
     this._req = undefined;
+    
     
     // TODO: Make the completion mechanism configurable (expose, postMessage, etc.)
     // TODO: Support a polling check on the opened window URL so the complete() call
     //       isn't necessary
     expose(this);
+    
+    var self = this;
+    this._onauthenticate = function(id, creds) {
+      self.emit('authenticate', id, creds);
+    }
   }
+  
+  /**
+   * Inherit from `Emitter`.
+   */
+  clazz.inherits(Admission, Emitter);
   
   Admission.prototype.login = function(name, cb) {
     var provider = this._providers[name];
@@ -36,8 +50,12 @@ function(exports, module, Request, redirect) {
       name = provider.name;
     }
     if (!name) throw new Error('Identity providers must have a name.');
-  
+    
     provider.redirect = this._redirect;
+    
+    if (provider.on) {
+      provider.on('authenticate', this._onauthenticate);
+    }
     
     this._providers[name] = provider;
     return this;
